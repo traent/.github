@@ -1,0 +1,54 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Renovate configuration for Traent.ManagePrompt — security vulnerability alerts only (C# / NuGet)",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    "security:openssf-scorecard"
+  ],
+  "enabled": true,
+  "baseBranchPatterns": ["main"],
+  "timezone": "UTC",
+  "labels": ["renovate", "dependencies"],
+  "reviewers": ["team:operations"],
+  "assignees": [],
+  "prConcurrentLimit": 10,
+  "prHourlyLimit": 5,
+  "nuget": {
+    "enabled": true
+  },
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["renovate", "security", "vulnerability"],
+    "automerge": false
+  },
+  "osvVulnerabilityAlerts": true,
+  "platformAutomerge": false,
+  "rebaseWhen": "behind-base-branch",
+  "pruneStaleBranches": true,
+  "packageRules": [
+    {
+      "description": "Disable all regular (non-vulnerability) updates",
+      "matchManagers": ["nuget"],
+      "matchPackageNames": ["*"],
+      "enabled": false
+    },
+    {
+      "description": "Security / vulnerability patches — enable, flag, never automerge, never recreate if closed",
+      "matchManagers": ["nuget"],
+      "matchPackageNames": ["*"],
+      "isVulnerabilityAlert": true,
+      "enabled": true,
+      "recreateWhen": "always",
+      "labels": ["renovate", "security", "vulnerability"],
+      "automerge": false,
+      "prPriority": 10
+    }
+  ],
+  "dependencyDashboardOSVVulnerabilitySummary": "unresolved",
+  "dependencyDashboardTitle": "Renovate Dependency Dashboard",
+  "dependencyDashboardLabels": ["renovate", "dashboard"],
+  "commitMessagePrefix": "chore(deps):",
+  "commitMessageAction": "update",
+  "branchPrefix": "renovate/"
+}
