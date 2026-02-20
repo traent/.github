@@ -11,7 +11,6 @@
   "timezone": "UTC",
   "labels": ["renovate", "dependencies"],
   "reviewers": [],
-  "assignees": [],
   "prConcurrentLimit": 10,
   "prHourlyLimit": 5,
   "nuget": {
