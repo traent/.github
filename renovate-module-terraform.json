@@ -29,6 +29,15 @@
       "enabled": false
     },
     {
+      "description": "Enable major version updates",
+      "matchPackageNames": ["*"],
+      "matchUpdateTypes": ["major"],
+      "enabled": true,
+      "labels": ["renovate", "dependencies", "major"],
+      "automerge": false,
+      "prPriority": 5
+    },
+    {
       "description": "Security / vulnerability patches — enable, flag, never automerge, never recreate if closed",
       "matchPackageNames": ["*"],
       "isVulnerabilityAlert": true,
