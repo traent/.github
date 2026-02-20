@@ -10,6 +10,7 @@ jobs:
       contents: write
       pull-requests: write
       issues: write
+      members: read
     steps:
       - uses: actions/checkout@v4
       - uses: renovatebot/github-action@v46.0.0
