@@ -34,7 +34,7 @@
       "matchPackageNames": ["*"],
       "isVulnerabilityAlert": true,
       "enabled": true,
-      "recreateWhen": "never",
+      "recreateWhen": "always", 
       "labels": ["renovate", "security", "vulnerability"],
       "automerge": false,
       "prPriority": 10
