@@ -10,7 +10,6 @@
   "baseBranchPatterns": ["main"],
   "timezone": "UTC",
   "labels": ["renovate", "dependencies"],
-  // "reviewers": ["mvitale-traent", "ajaber-traent"],
   "reviewers": ["team:operations"],
   "prConcurrentLimit": 10,
   "prHourlyLimit": 5,
