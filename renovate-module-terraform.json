@@ -10,8 +10,8 @@
   "baseBranchPatterns": ["main"],
   "timezone": "UTC",
   "labels": ["renovate", "dependencies"],
-  "reviewers": [],
-  "assignees": [],
+  "reviewers": ["team:operations"],
+  "assignees": ["team:operations"],
   "prConcurrentLimit": 10,
   "prHourlyLimit": 5,
   "vulnerabilityAlerts": {
