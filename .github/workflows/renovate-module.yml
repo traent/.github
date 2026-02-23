@@ -4,7 +4,7 @@ on:
 jobs:
   renovate:
     name: Renovate dependency updates & security scan
-    runs-on: TestGHA-8
+    runs-on: TestGHA-4
     timeout-minutes: 60
     permissions:
       contents: write
