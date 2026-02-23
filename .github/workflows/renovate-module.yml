@@ -21,6 +21,6 @@ jobs:
         env:
           RENOVATE_REPOSITORIES: ${{ github.repository }}
           RENOVATE_DRY_RUN: ${{ github.event.inputs.create_prs == 'false' && 'lookup' || '' }}
-          LOG_LEVEL: ${{ github.event.inputs.log_level || 'info' }}
+          LOG_LEVEL: info
           RENOVATE_OSV_VULNERABILITY_ALERTS: "true"
           RENOVATE_REQUIRE_CONFIG: "required"

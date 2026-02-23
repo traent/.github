@@ -32,7 +32,7 @@
       "description": "Enable major version updates",
       "matchPackageNames": ["*"],
       "matchUpdateTypes": ["major"],
-      "rangeStrategy": "replace",
+      "rangeStrategy": "replace", 
       "enabled": true,
       "labels": ["renovate", "dependencies", "major"],
       "automerge": false,
