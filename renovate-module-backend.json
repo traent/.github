@@ -7,7 +7,7 @@
     "security:openssf-scorecard"
   ],
   "enabled": true,
-  "baseBranchPatterns": ["main"],
+  "baseBranchPatterns": ["main", "master"],
   "timezone": "UTC",
   "labels": ["renovate", "dependencies"],
   "reviewers": [],
