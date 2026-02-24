@@ -1,0 +1,58 @@
+// {
+//   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+//   "description": "Renovate configuration for aws-infra-internal — security vulnerability alerts only",
+//   "extends": [
+//     "config:recommended",
+//     ":dependencyDashboard",
+//     "security:openssf-scorecard"
+//   ],
+//   "enabled": true,
+//   "baseBranchPatterns": ["main"],
+//   "timezone": "UTC",
+//   "labels": ["renovate", "dependencies"],
+//   "reviewers": [],
+//   "prConcurrentLimit": 10,
+//   "prHourlyLimit": 5,
+//   "vulnerabilityAlerts": {
+//     "enabled": true,
+//     "labels": ["renovate", "security", "vulnerability"],
+//     "automerge": false
+//   },
+//   "osvVulnerabilityAlerts": true,
+//   "platformAutomerge": false,
+//   "rebaseWhen": "behind-base-branch",
+//   "pruneStaleBranches": true,
+//   "packageRules": [
+//     {
+//       "description": "Disable all regular (non-vulnerability) updates",
+//       "matchPackageNames": ["*"],
+//       "enabled": false
+//     },
+//     {
+//       "description": "Enable major version updates",
+//       "matchPackageNames": ["*"],
+//       "matchUpdateTypes": ["major"],
+//       "rangeStrategy": "replace", 
+//       "enabled": true,
+//       "labels": ["renovate", "dependencies", "major"],
+//       "automerge": false,
+//       "prPriority": 5
+//     },
+//     {
+//       "description": "Security / vulnerability patches — enable, flag, never automerge, never recreate if closed",
+//       "matchPackageNames": ["*"],
+//       "isVulnerabilityAlert": true,
+//       "enabled": true,
+//       "recreateWhen": "always", 
+//       "labels": ["renovate", "security", "vulnerability"],
+//       "automerge": false,
+//       "prPriority": 10
+//     }
+//   ],
+//   "dependencyDashboardOSVVulnerabilitySummary": "unresolved",
+//   "dependencyDashboardTitle": "Renovate Dependency Dashboard",
+//   "dependencyDashboardLabels": ["renovate", "dashboard"],
+//   "commitMessagePrefix": "chore(deps):",
+//   "commitMessageAction": "update",
+//   "branchPrefix": "renovate/"
+// }

@@ -1,6 +1,7 @@
 {
+  "$comment": "Previous config (security vulnerability alerts only) before adding monitoring stack tracking: { extends: [config:recommended, :dependencyDashboard, security:openssf-scorecard], reviewers: [], packageRules: [disable all non-vulnerability updates, enable major updates, enable security patches] }",
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Renovate configuration for aws-infra-internal — security vulnerability alerts only",
+  "description": "Renovate configuration for aws-infra-internal — security vulnerability alerts and monitoring stack version tracking",
   "extends": [
     "config:recommended",
     ":dependencyDashboard",
@@ -10,7 +11,7 @@
   "baseBranchPatterns": ["main"],
   "timezone": "UTC",
   "labels": ["renovate", "dependencies"],
-  "reviewers": [],
+  "reviewers": ["ajaber-traent", "mvitale-traent"],
   "prConcurrentLimit": 10,
   "prHourlyLimit": 5,
   "vulnerabilityAlerts": {
@@ -22,9 +23,38 @@
   "platformAutomerge": false,
   "rebaseWhen": "behind-base-branch",
   "pruneStaleBranches": true,
+  "customManagers": [
+    {
+      "description": "Track Grafana Docker image version in Terraform locals",
+      "customType": "regex",
+      "fileMatch": ["^terraform/tools/services/grafana/locals\\.tf$"],
+      "matchStrings": ["grafana_version\\s*=\\s*\"(?<currentValue>[^\"]+)\""],
+      "depNameTemplate": "grafana/grafana",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
+    },
+    {
+      "description": "Track Alertmanager Docker image version in Terraform locals",
+      "customType": "regex",
+      "fileMatch": ["^terraform/tools/services/alertmanager/main\\.tf$"],
+      "matchStrings": ["alertmanager_version\\s*=\\s*\"(?<currentValue>[^\"]+)\""],
+      "depNameTemplate": "prom/alertmanager",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
+    },
+    {
+      "description": "Track Prometheus Docker image version in Terraform locals",
+      "customType": "regex",
+      "fileMatch": ["^terraform/tools/services/prometheus/main\\.tf$"],
+      "matchStrings": ["prometheus_version\\s*=\\s*\"(?<currentValue>[^\"]+)\""],
+      "depNameTemplate": "prom/prometheus",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
+    }
+  ],
   "packageRules": [
     {
-      "description": "Disable all regular (non-vulnerability) updates",
+      "description": "Disable all regular (non-vulnerability) updates by default",
       "matchPackageNames": ["*"],
       "enabled": false
     },
@@ -32,7 +62,7 @@
       "description": "Enable major version updates",
       "matchPackageNames": ["*"],
       "matchUpdateTypes": ["major"],
-      "rangeStrategy": "replace", 
+      "rangeStrategy": "replace",
       "enabled": true,
       "labels": ["renovate", "dependencies", "major"],
       "automerge": false,
@@ -43,10 +73,20 @@
       "matchPackageNames": ["*"],
       "isVulnerabilityAlert": true,
       "enabled": true,
-      "recreateWhen": "always", 
+      "recreateWhen": "always",
       "labels": ["renovate", "security", "vulnerability"],
       "automerge": false,
       "prPriority": 10
+    },
+    {
+      "description": "Enable all update types for monitoring stack tools (Grafana, Alertmanager, Prometheus)",
+      "matchPackageNames": ["grafana/grafana", "prom/alertmanager", "prom/prometheus"],
+      "matchUpdateTypes": ["major", "minor", "patch"],
+      "enabled": true,
+      "labels": ["renovate", "dependencies", "monitoring"],
+      "automerge": false,
+      "prPriority": 3,
+      "groupName": null
     }
   ],
   "dependencyDashboardOSVVulnerabilitySummary": "unresolved",
