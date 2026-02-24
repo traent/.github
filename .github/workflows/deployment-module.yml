@@ -1,0 +1,349 @@
+# Reusable deployment workflow module for Build, Push to ECR, Deploy via Terraform, and Verify on ECS.
+#
+# Usage: Call this workflow from service-specific workflows using `workflow_call`.
+# This module handles the full lifecycle: build -> health check -> push -> deploy -> verify.
+#
+# Example caller workflow:
+#   jobs:
+#     deploy:
+#       uses: ./.github/workflows/deployment-module.yml
+#       with:
+#         release_version: ${{ github.event.inputs.release_version }}
+#         deploy_only: ${{ github.event.inputs.deploy_only == 'true' }}
+#         ecr_registry: "348144892721.dkr.ecr.eu-south-1.amazonaws.com"
+#         ecr_repository: "traent-rcs/traent-rcs-backend"
+#         container_name: "traent-rcs-backend"
+#         cluster_name: "traent-rcs-cluster-livedev"
+#         service_name: "traent-rcs-backend-service-livedev"
+#         aws_region: "eu-south-1"
+#         aws_account_id: "348144892721"
+#         terraform_path: "terraform/overlays/traent-rcs/services/traent-rcs-backend/livedev"
+#       secrets:
+#         GH_PAT_INTERNAL: ${{ secrets.GH_PAT_INTERNAL }}
+
+name: Deployment Module
+
+on:
+  workflow_call:
+    inputs:
+      # ============================================
+      # REQUIRED INPUTS
+      # ============================================
+      release_version:
+        description: "Release version (e.g., 1.0.0)"
+        required: true
+        type: string
+      ecr_registry:
+        description: "ECR registry URL (e.g., 348144892721.dkr.ecr.eu-south-1.amazonaws.com)"
+        required: true
+        type: string
+      ecr_repository:
+        description: "ECR repository name (e.g., traent-rcs/traent-rcs-backend)"
+        required: true
+        type: string
+      container_name:
+        description: "Docker container/image name for build and tagging"
+        required: true
+        type: string
+      cluster_name:
+        description: "ECS cluster name for deployment"
+        required: true
+        type: string
+      service_name:
+        description: "ECS service name for deployment"
+        required: true
+        type: string
+      aws_region:
+        description: "AWS region"
+        required: true
+        type: string
+      aws_account_id:
+        description: "AWS account ID for IAM role"
+        required: true
+        type: string
+      terraform_path:
+        description: "Path to Terraform config relative to aws-infra-internal repo root (e.g., terraform/overlays/traent-rcs/services/traent-rcs-backend/livedev)"
+        required: true
+        type: string
+
+      # ============================================
+      # OPTIONAL INPUTS
+      # ============================================
+      deploy_only:
+        description: "Deploy only, without building the image"
+        required: false
+        type: boolean
+        default: false
+      dockerfile:
+        description: "Path to Dockerfile (default: Dockerfile)"
+        required: false
+        type: string
+        default: "Dockerfile"
+      runner:
+        description: "GitHub Actions runner label"
+        required: false
+        type: string
+        default: "TestGHA-8"
+      health_check_type:
+        description: "Health check method: 'curl' (HTTP endpoint), 'docker-compose' (uses docker compose), or 'docker-healthcheck' (polls Docker HEALTHCHECK)"
+        required: false
+        type: string
+        default: "curl"
+      health_check_port:
+        description: "Port for curl health check (default: 8080)"
+        required: false
+        type: string
+        default: "8080"
+      health_check_path:
+        description: "Path for curl health check (default: /health)"
+        required: false
+        type: string
+        default: "/health"
+      verify_ecs_deployment:
+        description: "Whether to verify ECS task deployment after Terraform apply"
+        required: false
+        type: boolean
+        default: true
+      skip_build:
+        description: "Skip the build steps entirely (useful when caller handles build externally)"
+        required: false
+        type: boolean
+        default: false
+
+    secrets:
+      GH_PAT_INTERNAL:
+        description: "GitHub PAT for accessing traent/aws-infra-internal"
+        required: true
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy
+    runs-on: ${{ inputs.runner }}
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      # ============================================
+      # SETUP
+      # ============================================
+      - name: Checkout code
+        if: ${{ !inputs.deploy_only && !inputs.skip_build }}
+        uses: actions/checkout@v6
+
+      - name: Validate release version
+        run: |
+          if [ -z "${{ inputs.release_version }}" ]; then
+            echo "❌ Error: Release version is required but not set"
+            exit 1
+          fi
+          echo "✅ Release version validated: ${{ inputs.release_version }}"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: arn:aws:iam::${{ inputs.aws_account_id }}:role/github-actions-role
+          aws-region: ${{ inputs.aws_region }}
+
+      # ============================================
+      # DEPLOY_ONLY MODE: Verify image exists in ECR
+      # ============================================
+      - name: Verify image exists in ECR (deploy_only)
+        if: ${{ inputs.deploy_only }}
+        run: |
+          echo "Checking if image exists in ECR..."
+          if aws ecr describe-images \
+            --repository-name "${{ inputs.ecr_repository }}" \
+            --image-ids imageTag="${{ inputs.release_version }}" \
+            --region ${{ inputs.aws_region }} > /dev/null 2>&1; then
+            echo "✅ Image ${{ inputs.ecr_repository }}:${{ inputs.release_version }} exists in ECR"
+          else
+            echo "❌ Error: Image ${{ inputs.ecr_repository }}:${{ inputs.release_version }} does not exist in ECR"
+            echo "Cannot deploy_only without an existing image. Please build the image first or check the release version."
+            exit 1
+          fi
+
+      # ============================================
+      # BUILD STEPS (skipped when deploy_only=true)
+      # ============================================
+      - name: Login to Amazon ECR
+        if: ${{ !inputs.deploy_only && !inputs.skip_build }}
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Docker Build
+        if: ${{ !inputs.deploy_only && !inputs.skip_build }}
+        run: |
+          docker build -f ${{ inputs.dockerfile }} -t ${{ inputs.container_name }} .
+
+      - name: Verify Container Health (curl)
+        if: ${{ !inputs.deploy_only && !inputs.skip_build && inputs.health_check_type == 'curl' }}
+        run: |
+          echo "Starting container and verifying health endpoint..."
+
+          CONTAINER_ID=$(docker run -d -p ${{ inputs.health_check_port }}:${{ inputs.health_check_port }} --name ${{ inputs.container_name }}-test ${{ inputs.container_name }})
+          sleep 10
+
+          if curl -f http://localhost:${{ inputs.health_check_port }}${{ inputs.health_check_path }}; then
+            echo "✅ Health endpoint is working"
+            docker stop $CONTAINER_ID && docker rm $CONTAINER_ID
+          else
+            echo "❌ Health endpoint failed"
+            docker logs $CONTAINER_ID
+            docker rm -f $CONTAINER_ID
+            exit 1
+          fi
+
+      - name: Verify Container Health (docker compose)
+        if: ${{ !inputs.deploy_only && !inputs.skip_build && inputs.health_check_type == 'docker-compose' }}
+        run: |
+          echo "Starting container with docker compose..."
+          docker compose up -d
+
+          echo "Waiting for container to be ready..."
+          sleep 10
+
+          echo "Checking health endpoint..."
+          if curl -f http://localhost:${{ inputs.health_check_port }}${{ inputs.health_check_path }}; then
+            echo "✅ Container is healthy"
+          else
+            echo "❌ Health check failed"
+            docker compose logs
+            docker compose down
+            exit 1
+          fi
+
+          echo "Cleaning up..."
+          docker compose down
+
+      - name: Verify Container Health (Docker HEALTHCHECK)
+        if: ${{ !inputs.deploy_only && !inputs.skip_build && inputs.health_check_type == 'docker-healthcheck' }}
+        run: |
+          echo "Starting container and waiting for health check..."
+          CONTAINER_ID=$(docker run -d --name ${{ inputs.container_name }}-test ${{ inputs.container_name }})
+
+          # Wait for health check to complete (max 120s)
+          for i in {1..12}; do
+            STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$CONTAINER_ID" 2>/dev/null || echo "none")
+            echo "Health status: $STATUS"
+
+            if [[ "$STATUS" == "healthy" ]]; then
+              echo "✅ Container is healthy"
+              docker stop $CONTAINER_ID && docker rm $CONTAINER_ID
+              exit 0
+            elif [[ "$STATUS" == "unhealthy" ]]; then
+              echo "❌ Container is unhealthy"
+              docker logs $CONTAINER_ID
+              docker rm -f $CONTAINER_ID
+              exit 1
+            fi
+            sleep 10
+          done
+
+          echo "❌ Health check timed out"
+          docker logs $CONTAINER_ID
+          docker rm -f $CONTAINER_ID
+          exit 1
+
+      - name: Push to ECR
+        if: ${{ !inputs.deploy_only && !inputs.skip_build }}
+        run: |
+          IMAGE_URI=${{ inputs.ecr_registry }}/${{ inputs.ecr_repository }}:${{ inputs.release_version }}
+
+          docker tag ${{ inputs.container_name }} ${IMAGE_URI}
+          docker push ${IMAGE_URI}
+
+          echo "Pushed image: ${IMAGE_URI}"
+
+      # ============================================
+      # DEPLOY STEPS (always run)
+      # ============================================
+      - name: Checkout Terraform repository
+        uses: actions/checkout@v6
+        with:
+          repository: traent/aws-infra-internal
+          token: ${{ secrets.GH_PAT_INTERNAL }}
+          path: aws-infra-internal
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Apply Terraform
+        working-directory: aws-infra-internal/${{ inputs.terraform_path }}
+        env:
+          TF_VAR_release_version: ${{ inputs.release_version }}
+        run: |
+          echo "Deploying version: $TF_VAR_release_version"
+          terraform init
+          terraform apply -auto-approve -parallelism=10
+
+      # ============================================
+      # VERIFY DEPLOYMENT
+      # ============================================
+      - name: Verify ECS Task Deployment and Health
+        if: ${{ inputs.verify_ecs_deployment }}
+        run: |
+          echo "Verifying ECS task deployment..."
+
+          # Wait for ECS service to stabilize (max 10 minutes)
+          echo "Waiting for ECS service to reach stable state..."
+          aws ecs wait services-stable \
+            --cluster ${{ inputs.cluster_name }} \
+            --services ${{ inputs.service_name }} \
+            --region ${{ inputs.aws_region }} || {
+              echo "❌ ECS service failed to stabilize"
+              aws ecs describe-services \
+                --cluster ${{ inputs.cluster_name }} \
+                --services ${{ inputs.service_name }} \
+                --region ${{ inputs.aws_region }}
+              exit 1
+            }
+
+          # Wait for old tasks to fully terminate before checking running tasks
+          echo "Waiting for task transition to complete..."
+          sleep 10
+
+          # Get the running task details
+          echo "Fetching running task details..."
+          TASK_ARN=$(aws ecs list-tasks \
+            --cluster ${{ inputs.cluster_name }} \
+            --service-name ${{ inputs.service_name }} \
+            --desired-status RUNNING \
+            --region ${{ inputs.aws_region }} \
+            --query 'taskArns[0]' \
+            --output text)
+
+          if [ -z "$TASK_ARN" ] || [ "$TASK_ARN" == "None" ]; then
+            echo "❌ No running tasks found"
+            exit 1
+          fi
+
+          echo "✅ Task is running: ${TASK_ARN}"
+
+          # Get task details including health status
+          TASK_HEALTH=$(aws ecs describe-tasks \
+            --cluster ${{ inputs.cluster_name }} \
+            --tasks ${TASK_ARN} \
+            --region ${{ inputs.aws_region }} \
+            --query 'tasks[0].healthStatus' \
+            --output text)
+
+          echo "Task health status: ${TASK_HEALTH}"
+
+          # Verify the deployed version matches expected version
+          DEPLOYED_IMAGE=$(aws ecs describe-tasks \
+            --cluster ${{ inputs.cluster_name }} \
+            --tasks ${TASK_ARN} \
+            --region ${{ inputs.aws_region }} \
+            --query 'tasks[0].containers[0].image' \
+            --output text)
+
+          echo "Deployed image: ${DEPLOYED_IMAGE}"
+
+          if echo "${DEPLOYED_IMAGE}" | grep -q "${{ inputs.release_version }}"; then
+            echo "✅ Deployed version matches expected: ${{ inputs.release_version }}"
+          else
+            echo "❌ Deployed version mismatch. Expected: ${{ inputs.release_version }}, Got: ${DEPLOYED_IMAGE}"
+            echo "New deployment may have failed. Please check ECS service and task details."
+            exit 1
+          fi
