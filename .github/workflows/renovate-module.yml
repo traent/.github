@@ -13,6 +13,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - name: Validate renovate.json
+        run: python3 -c "import json; json.load(open('renovate.json'))"
       - uses: renovatebot/github-action@v46.0.0
         with:
           configurationFile: ${{ github.workspace }}/renovate.json
