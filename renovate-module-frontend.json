@@ -39,6 +39,7 @@
       "matchUpdateTypes": ["major"],
       "rangeStrategy": "replace",
       "enabled": true,
+      "recreateWhen": "never", 
       "labels": ["renovate", "dependencies", "major"],
       "automerge": false,
       "prPriority": 5
@@ -49,7 +50,7 @@
       "matchPackageNames": ["*"],
       "isVulnerabilityAlert": true,
       "enabled": true,
-      "recreateWhen": "always",
+      "recreateWhen": "never",
       "labels": ["renovate", "security", "vulnerability"],
       "automerge": false,
       "prPriority": 10

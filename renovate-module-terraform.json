@@ -73,7 +73,7 @@
       "matchPackageNames": ["*"],
       "isVulnerabilityAlert": true,
       "enabled": true,
-      "recreateWhen": "always",
+      "recreateWhen": "never",
       "labels": ["renovate", "security", "vulnerability"],
       "automerge": false,
       "prPriority": 10
@@ -83,6 +83,7 @@
       "matchPackageNames": ["grafana/grafana", "prom/alertmanager", "prom/prometheus"],
       "matchUpdateTypes": ["major", "minor", "patch"],
       "enabled": true,
+      "recreateWhen": "never", 
       "labels": ["renovate", "dependencies", "monitoring"],
       "automerge": false,
       "prPriority": 3,

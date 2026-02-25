@@ -38,6 +38,7 @@
       "matchPackageNames": ["*"],
       "matchUpdateTypes": ["major"],
       "enabled": true,
+      "recreateWhen": "never", 
       "labels": ["renovate", "dependencies", "major"],
       "automerge": false,
       "prPriority": 5
