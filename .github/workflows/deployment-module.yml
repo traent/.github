@@ -320,22 +320,22 @@ jobs:
 
           echo "✅ Task is running: ${TASK_ARN}"
 
-          # Get task details including health status
+          # Get task details including health status (filter by container name)
           TASK_HEALTH=$(aws ecs describe-tasks \
             --cluster ${{ inputs.cluster_name }} \
             --tasks ${TASK_ARN} \
             --region ${{ inputs.aws_region }} \
-            --query 'tasks[0].healthStatus' \
+            --query "tasks[0].containers[?name=='${{ inputs.container_name }}'].healthStatus | [0]" \
             --output text)
 
           echo "Task health status: ${TASK_HEALTH}"
 
-          # Verify the deployed version matches expected version
+          # Verify the deployed version matches expected version (filter by container name)
           DEPLOYED_IMAGE=$(aws ecs describe-tasks \
             --cluster ${{ inputs.cluster_name }} \
             --tasks ${TASK_ARN} \
             --region ${{ inputs.aws_region }} \
-            --query 'tasks[0].containers[0].image' \
+            --query "tasks[0].containers[?name=='${{ inputs.container_name }}'].image | [0]" \
             --output text)
 
           echo "Deployed image: ${DEPLOYED_IMAGE}"
