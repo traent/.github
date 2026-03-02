@@ -1,0 +1,70 @@
+# Reusable SonarQube analysis workflow module.
+#
+# Usage: Call this workflow from service-specific workflows using `workflow_call`.
+# Project-specific configuration (projectKey, projectName, sources, exclusions, etc.)
+# must be defined in a `sonar-project.properties` file at the root of each calling repo.
+#
+# Example sonar-project.properties:
+#   sonar.projectKey=traent_my-service_xxxxxxxx
+#   sonar.projectName=my-service
+#   sonar.sources=src
+#   sonar.exclusions=**/node_modules/**,**/*.spec.* (exclude irrelevant/sensitive files from analysis)
+#
+# Example caller workflow:
+#   name: SonarQube Analysis
+#   on:
+#     pull_request:
+#       types: [opened, synchronize, reopened]
+#     push:
+#       branches: [main, master]
+#   jobs:
+#     sonarqube:
+#       uses: traent/.github/.github/workflows/sonarqube.yml@master
+#       secrets:
+#         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+#         SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+name: SonarQube Module
+
+on:
+  workflow_call:
+    secrets:
+      SONAR_TOKEN:
+        description: "SonarQube authentication token"
+        required: true
+      SONAR_HOST_URL:
+        description: "SonarQube server URL"
+        required: true
+
+jobs:
+  sonarqube:
+    name: SonarQube Scan
+    runs-on: TestGHA-8
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required for SonarQube blame/history analysis
+
+      - name: SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@v6
+        with:
+          args: >
+            ${{ github.event_name == 'pull_request'
+              && format('-Dsonar.pullrequest.key={0} -Dsonar.pullrequest.branch={1} -Dsonar.pullrequest.base={2} -Dsonar.scm.revision={3}',
+                   github.event.pull_request.number,
+                   github.head_ref,
+                   github.base_ref,
+                   github.event.pull_request.head.sha)
+              || '' }}
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      - name: SonarQube Quality Gate
+        uses: sonarsource/sonarqube-quality-gate-action@v1.1.0
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
