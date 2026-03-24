@@ -109,6 +109,11 @@ on:
         required: false
         type: boolean
         default: false
+      docker_build_args:
+        description: "Additional Docker build arguments (e.g., 'BUILD_CONFIGURATION=livedev'). Each line becomes a --build-arg."
+        required: false
+        type: string
+        default: ""
 
     secrets:
       GH_PAT_INTERNAL:
@@ -174,7 +179,13 @@ jobs:
       - name: Docker Build
         if: ${{ !inputs.deploy_only && !inputs.skip_build }}
         run: |
-          docker build -f ${{ inputs.dockerfile }} -t ${{ inputs.container_name }} .
+          BUILD_ARGS=""
+          if [ -n "${{ inputs.docker_build_args }}" ]; then
+            while IFS= read -r arg; do
+              [ -n "$arg" ] && BUILD_ARGS="$BUILD_ARGS --build-arg $arg"
+            done <<< "${{ inputs.docker_build_args }}"
+          fi
+          docker build -f ${{ inputs.dockerfile }} $BUILD_ARGS -t ${{ inputs.container_name }} .
 
       - name: Verify Container Health (curl)
         if: ${{ !inputs.deploy_only && !inputs.skip_build && inputs.health_check_type == 'curl' }}
