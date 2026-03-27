@@ -275,7 +275,9 @@ jobs:
         run: |
           echo "Deploying version: $TF_VAR_release_version"
           terraform init
-          terraform apply -auto-approve -parallelism=10
+          terraform apply -auto-approve -parallelism=10 \
+            -target=module.ecs_service.aws_ecs_task_definition.this \
+            -target=module.ecs_service.aws_ecs_service.this
 
       # ============================================
       # VERIFY DEPLOYMENT
